@@ -209,7 +209,7 @@ Saved figures (key **S** or `--batch-save` mode) are stored by default in `previ
 
 ### License
 
-This project is distributed under the **MIT License**. See the [LICENSE](LICENSE) file for details.
+This project is shared under a **Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)** license. This allows others to copy, redistribute, and adapt the material for non-commercial purposes. Appropriate credit must be given to the authors. See the [LICENSE](LICENSE) file for details.
 
 ### Citation
 
@@ -221,6 +221,6 @@ If you use this software in your research, please cite:
   title = {WSI Histology Mask Annotator: Pipeline for QuPath export and stroma annotation},
   year = {2026},
   url = {https://github.com/abelBEDOYA/wsi-histology-mask-annotator},
-  license = {MIT}
+  license = {CC-BY-NC-4.0}
 }
 ```
