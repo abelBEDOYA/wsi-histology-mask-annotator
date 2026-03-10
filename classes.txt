@@ -1,0 +1,29 @@
+0: Background
+1: Tumor
+2: Bening gland
+3: Blood vessels
+4: Fibromuscular bundles
+5: Abnormal secretions
+6: Contamination with another tissue
+7: Prominent nucleolus
+8: Immune cells
+9: Nerve
+10: Artifact
+11: Seminal vesicle
+12: Adipose tissue
+13: Normal secretions
+14: Stromal retraction spaces
+15: Muscle
+16: Foreign body contamination
+17: High grade prostatic intraepithelial neoplasia (HGPIN)
+18: Calcifications
+19: Intestinal glands and mucus
+20: Perineural invasion (PNI)
+21: Hemorrahage
+22: Intraductal carcinoma
+23: Necrosis
+24: Mitosis
+25: Nerve ganglion
+26: Atypical intraductal proliferation
+27: Red blood cells
+28: Stroma

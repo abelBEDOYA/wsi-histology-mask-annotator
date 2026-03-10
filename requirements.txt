@@ -1,0 +1,14 @@
+# Core dependencies
+numpy>=1.20.0
+matplotlib>=3.5.0
+tifffile>=2023.1.0
+
+# Image processing
+scipy>=1.10.0
+Pillow>=9.0.0
+
+# TIFF tile reading (used by tifffile for efficient access)
+zarr>=2.14.0
+
+
+imagecodecs==2026.1.14
