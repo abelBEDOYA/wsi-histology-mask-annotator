@@ -2,20 +2,20 @@
 """
 QuPath Export Handler
 
-Clase para manejar eficientemente las imágenes y máscaras OME-TIFF piramidales
-exportadas desde QuPath. Optimizada para no saturar RAM.
+Class to efficiently handle pyramidal OME-TIFF images and masks exported from QuPath.
+Optimized to avoid RAM saturation.
 
-Características:
-- Lectura eficiente usando niveles de pirámide
-- Visualización interactiva con zoom/pan sincronizado
-- Carga lazy: solo carga lo que se muestra
-- Soporte para lectura por regiones
+Features:
+- Efficient reading using pyramid levels
+- Interactive visualization with synchronized zoom/pan
+- Lazy loading: only loads what is displayed
+- Support for region-based reading
 
-Uso:
+Usage:
     from qupath_handler import QuPathHandler
-    
-    handler = QuPathHandler("/ruta/a/datos")
-    handler.load_pair("nombre_imagen")
+
+    handler = QuPathHandler("/path/to/data")
+    handler.load_pair("image_name")
     handler.visualize_interactive()
 """
 
@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Tuple, List, Dict, Any, Optional
 import numpy as np
 
-# Backend Agg para modo batch (sin ventana gráfica)
+# Agg backend for batch mode (no GUI window)
 if "--batch-save" in sys.argv or "--save-all" in sys.argv:
     import matplotlib
     matplotlib.use("Agg")
@@ -40,28 +40,28 @@ import tifffile
 
 def load_clinical_data(data_dir: Path) -> Dict[str, Dict[str, str]]:
     """
-    Carga datos clínicos desde data/clinical_diagnosis.txt
-    
-    Soporta dos formatos de CSV:
-    - Antiguo: AnonymusCode,Diagnosis,ISUPGradeGroup,Gleasonscore,Scanner
-    - Nuevo: ANONYMOUS_CODE,PATIENT_NUMBER,AGE,PROSTATE-SPECIFIC_ANTIGEN_(PSA)_LEVEL,
-             DIGITAL_RECTAL_EXAM,FINDINGS_IN_PELVIC_MRI,SLIDE_DIAGNOSIS,
-             ISUP_Grade_Group_,Gleason_score,Scanner
-    
+    Load clinical data from data/clinical_diagnosis.txt
+
+    Supports two CSV formats:
+    - Legacy: AnonymusCode,Diagnosis,ISUPGradeGroup,Gleasonscore,Scanner
+    - New: ANONYMOUS_CODE,PATIENT_NUMBER,AGE,PROSTATE-SPECIFIC_ANTIGEN_(PSA)_LEVEL,
+           DIGITAL_RECTAL_EXAM,FINDINGS_IN_PELVIC_MRI,SLIDE_DIAGNOSIS,
+           ISUP_Grade_Group_,Gleason_score,Scanner
+
     Returns:
         Dict mapping image_name -> {diagnosis, isup, gleason, scanner, age, psa, ...}
     """
     clinical_data = {}
     
-    # Buscar el archivo en varias ubicaciones posibles
-    # Prioridad: directorio indicado > subdirectorio data > directorio padre
+    # Search for file in several possible locations
+    # Priority: specified dir > data subdir > parent dir
     possible_paths = [
-        data_dir / "clinical_diagnosis.txt",           # Directamente en dataset_dir
-        data_dir / "clinical_diagnosis.csv",           # Con extensión .csv
-        data_dir / "data" / "clinical_diagnosis.txt",  # En subdirectorio data/
-        data_dir / "data" / "clinical_diagnosis.csv",  # En data/ con .csv
-        data_dir.parent / "clinical_diagnosis.txt",    # En directorio padre
-        data_dir.parent / "data" / "clinical_diagnosis.txt",  # En padre/data/
+        data_dir / "clinical_diagnosis.txt",           # Directly in dataset_dir
+        data_dir / "clinical_diagnosis.csv",          # With .csv extension
+        data_dir / "data" / "clinical_diagnosis.txt",  # In data/ subdir
+        data_dir / "data" / "clinical_diagnosis.csv",  # In data/ with .csv
+        data_dir.parent / "clinical_diagnosis.txt",    # In parent dir
+        data_dir.parent / "data" / "clinical_diagnosis.txt",  # In parent/data/
     ]
     
     csv_path = None
@@ -71,20 +71,20 @@ def load_clinical_data(data_dir: Path) -> Dict[str, Dict[str, str]]:
             break
     
     if csv_path is None:
-        print(f"[DEBUG] No se encontró clinical_diagnosis.txt")
+        print(f"[DEBUG] clinical_diagnosis.txt not found")
         print(f"[DEBUG] data_dir = {data_dir}")
-        print(f"[DEBUG] Buscado en:")
-        for p in possible_paths[:4]:  # Mostrar las primeras 4 rutas
+        print(f"[DEBUG] Searched in:")
+        for p in possible_paths[:4]:  # Show first 4 paths
             print(f"         - {p}")
         return clinical_data
-    
-    print(f"[Clinical] Cargando desde: {csv_path}")
+
+    print(f"[Clinical] Loading from: {csv_path}")
     
     try:
         with open(csv_path, 'r', encoding='utf-8') as f:
             reader = csv.DictReader(f)
             for row in reader:
-                # Soportar ambos formatos de cabecera
+                # Support both header formats
                 code = (
                     row.get('ANONYMOUS_CODE', '') or 
                     row.get('AnonymusCode', '')
@@ -92,7 +92,7 @@ def load_clinical_data(data_dir: Path) -> Dict[str, Dict[str, str]]:
                 
                 if code:
                     clinical_data[code] = {
-                        # Diagnóstico
+                        # Diagnosis
                         'diagnosis': (
                             row.get('SLIDE_DIAGNOSIS', '') or 
                             row.get('Diagnosis', '')
@@ -109,7 +109,7 @@ def load_clinical_data(data_dir: Path) -> Dict[str, Dict[str, str]]:
                         ),
                         # Scanner
                         'scanner': row.get('Scanner', ''),
-                        # Nuevos campos (solo en formato nuevo)
+                        # New fields (only in new format)
                         'patient_number': row.get('PATIENT_NUMBER', ''),
                         'age': row.get('AGE', ''),
                         'psa': row.get('PROSTATE-SPECIFIC_ANTIGEN_(PSA)_LEVEL', ''),
@@ -117,7 +117,7 @@ def load_clinical_data(data_dir: Path) -> Dict[str, Dict[str, str]]:
                         'mri_findings': row.get('FINDINGS_IN_PELVIC_MRI', ''),
                     }
     except Exception:
-        pass  # Si falla la lectura, devolver diccionario vacío
+        pass  # If read fails, return empty dict
     
     return clinical_data
 
@@ -154,7 +154,7 @@ CLASS_NAMES = {
 }
 
 CLASS_COLORS_HEX = [
-    "#000000",  # 0: Background (negro)
+    "#000000",  # 0: Background (black)
     "#B83B5E",  # 1: Tumor
     "#F38181",  # 2: Bening gland
     "#AA96DA",  # 3: Blood vessels
@@ -166,7 +166,7 @@ CLASS_COLORS_HEX = [
     "#E9D5CA",  # 9: Nerve
     "#4ECDC4",  # 10: Artifact
     "#FFB6B9",  # 11: Seminal vesicle
-    "#5BE67D",  # 12: Adipose tissue (verde)
+    "#5BE67D",  # 12: Adipose tissue (green)
     "#61C0BF",  # 13: Normal secretions
     "#8AC6D1",  # 14: Stromal retraction spaces
     "#903749",  # 15: Muscle
@@ -186,7 +186,7 @@ CLASS_COLORS_HEX = [
 ]
 
 def hex_to_rgb(hex_color: str) -> Tuple[int, int, int]:
-    """Convierte color hex a RGB."""
+    """Convert hex color to RGB."""
     hex_color = hex_color.lstrip('#')
     return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
 
@@ -196,12 +196,12 @@ CLASS_COLORS_RGB = [hex_to_rgb(c) for c in CLASS_COLORS_HEX]
 
 class PyramidTiff:
     """
-    Wrapper eficiente para TIFF piramidal (OME-TIFF).
-    
-    Detecta automáticamente la estructura de la pirámide:
-    - series[0].levels: Niveles dentro de una serie (OME-TIFF estándar)
-    - Múltiples series: Cada serie es un nivel
-    - Páginas: Cada página es un nivel
+    Efficient wrapper for pyramidal TIFF (OME-TIFF).
+
+    Automatically detects pyramid structure:
+    - series[0].levels: Levels within a series (standard OME-TIFF)
+    - Multiple series: Each series is a level
+    - Pages: Each page is a level
     """
     
     def __init__(self, path: str, verbose: bool = True):
@@ -209,21 +209,21 @@ class PyramidTiff:
         self.verbose = verbose
         self.tif = tifffile.TiffFile(path)
         
-        # Detectar estructura de la pirámide
+        # Detect pyramid structure
         self._detect_pyramid_structure()
-        
-        # Cachear info de niveles
+
+        # Cache level info
         self._cache_level_info()
         
         if self.verbose:
             self._print_info()
     
     def _detect_pyramid_structure(self) -> None:
-        """Detecta cómo están organizados los niveles de la pirámide."""
+        """Detect how pyramid levels are organized."""
         self._pyramid_type = None
         self._levels_source = []
         
-        # Opción 1: series[0].levels (OME-TIFF con subresoluciones)
+        # Option 1: series[0].levels (OME-TIFF with subresolutions)
         if len(self.tif.series) > 0:
             first_series = self.tif.series[0]
             if hasattr(first_series, 'levels') and len(first_series.levels) > 1:
@@ -232,9 +232,9 @@ class PyramidTiff:
                 self.n_levels = len(self._levels_source)
                 return
         
-        # Opción 2: Múltiples series (cada una es un nivel)
+        # Option 2: Multiple series (each is a level)
         if len(self.tif.series) > 1:
-            # Verificar que las series son de tamaño decreciente
+            # Verify series are decreasing in size
             shapes = [s.shape for s in self.tif.series]
             if self._shapes_are_pyramid(shapes):
                 self._pyramid_type = 'multiple_series'
@@ -242,7 +242,7 @@ class PyramidTiff:
                 self.n_levels = len(self._levels_source)
                 return
         
-        # Opción 3: Múltiples páginas
+        # Option 3: Multiple pages
         if len(self.tif.pages) > 1:
             shapes = [p.shape for p in self.tif.pages]
             if self._shapes_are_pyramid(shapes):
@@ -251,7 +251,7 @@ class PyramidTiff:
                 self.n_levels = len(self._levels_source)
                 return
         
-        # Fallback: Solo un nivel
+        # Fallback: Single level only
         self._pyramid_type = 'single'
         if len(self.tif.series) > 0:
             self._levels_source = [self.tif.series[0]]
@@ -260,25 +260,25 @@ class PyramidTiff:
         self.n_levels = 1
     
     def _shapes_are_pyramid(self, shapes: List[Tuple]) -> bool:
-        """Verifica si las shapes corresponden a una pirámide (tamaños decrecientes)."""
+        """Check if shapes correspond to a pyramid (decreasing sizes)."""
         if len(shapes) < 2:
             return False
         
-        # Extraer el tamaño principal de cada shape
+        # Extract main size from each shape
         sizes = []
         for shape in shapes:
-            # Tomar las dos dimensiones más grandes
+            # Take the two largest dimensions
             dims = sorted(shape, reverse=True)[:2]
             sizes.append(max(dims))
         
-        # Verificar que son decrecientes
+        # Verify they are decreasing
         for i in range(1, len(sizes)):
             if sizes[i] >= sizes[i-1]:
                 return False
         return True
     
     def _cache_level_info(self) -> None:
-        """Cachea información de cada nivel SIN cargar datos."""
+        """Cache info for each level WITHOUT loading data."""
         self.level_info: List[Dict[str, Any]] = []
         base_w, base_h = 0, 0
         
@@ -302,7 +302,7 @@ class PyramidTiff:
             })
     
     def _parse_shape(self, shape: Tuple) -> Tuple[int, int, int]:
-        """Interpreta shape para obtener H, W, C."""
+        """Interpret shape to get H, W, C."""
         if len(shape) == 2:
             return shape[0], shape[1], 1
         elif len(shape) == 3:
@@ -311,20 +311,20 @@ class PyramidTiff:
             else:  # (H, W, C)
                 return shape[0], shape[1], shape[2]
         elif len(shape) >= 4:
-            # OME: (T, C, Z, Y, X) o similar - Y, X son las últimas
+            # OME: (T, C, Z, Y, X) or similar - Y, X are last
             return shape[-2], shape[-1], shape[1] if shape[1] <= 4 else 1
         return shape[0], 1, 1
     
     def _print_info(self) -> None:
-        """Imprime información de debug."""
-        print(f"  [PyramidTiff] Tipo: {self._pyramid_type}")
-        print(f"  [PyramidTiff] Niveles: {self.n_levels}")
+        """Print debug info."""
+        print(f"  [PyramidTiff] Type: {self._pyramid_type}")
+        print(f"  [PyramidTiff] Levels: {self.n_levels}")
         for info in self.level_info:
-            print(f"    Nivel {info['index']}: {info['width']}x{info['height']} "
+            print(f"    Level {info['index']}: {info['width']}x{info['height']} "
                   f"(ds: {info['downsample']:.0f}x, shape: {info['shape']})")
     
     def get_level_for_display(self, max_pixels: int = 4_000_000) -> int:
-        """Devuelve el nivel más adecuado dado un límite de píxeles."""
+        """Return the most suitable level given a pixel limit."""
         for info in self.level_info:
             pixels = info['width'] * info['height']
             if pixels <= max_pixels:
@@ -332,23 +332,23 @@ class PyramidTiff:
         return self.n_levels - 1
     
     def read_level(self, level: int = 0) -> np.ndarray:
-        """Lee un nivel completo de la pirámide."""
+        """Read a complete pyramid level."""
         level = min(level, self.n_levels - 1)
         
         if self.verbose:
             info = self.level_info[level]
-            print(f"  [PyramidTiff] Leyendo nivel {level}: {info['width']}x{info['height']}")
+            print(f"  [PyramidTiff] Reading level {level}: {info['width']}x{info['height']}")
         
         level_src = self._levels_source[level]
         data = level_src.asarray()
         
         if self.verbose:
-            print(f"  [PyramidTiff] Cargado: shape={data.shape}, RAM={data.nbytes/1024/1024:.1f}MB")
+            print(f"  [PyramidTiff] Loaded: shape={data.shape}, RAM={data.nbytes/1024/1024:.1f}MB")
         
         return self._normalize_shape(data)
     
     def _normalize_shape(self, data: np.ndarray) -> np.ndarray:
-        """Normaliza a (H, W) o (H, W, C)."""
+        """Normalize to (H, W) or (H, W, C)."""
         data = np.squeeze(data)
         
         if data.ndim == 2:
@@ -358,14 +358,14 @@ class PyramidTiff:
                 return np.moveaxis(data, 0, -1)
             return data
         
-        # Más de 3 dimensiones: reducir
+        # More than 3 dimensions: reduce
         while data.ndim > 3:
             data = data[0]
         return self._normalize_shape(data)
     
     @property
     def base_shape(self) -> Tuple[int, int]:
-        """Devuelve (width, height) del nivel base."""
+        """Return (width, height) of base level."""
         return (self.level_info[0]['width'], self.level_info[0]['height'])
     
     def close(self) -> None:
@@ -380,8 +380,8 @@ class PyramidTiff:
 
 class QuPathHandler:
     """
-    Manejador para pares imagen/máscara exportados desde QuPath.
-    Optimizado para visualización eficiente sin saturar RAM.
+    Handler for image/mask pairs exported from QuPath.
+    Optimized for efficient visualization without saturating RAM.
     """
     
     def __init__(
@@ -394,11 +394,11 @@ class QuPathHandler:
     ):
         """
         Args:
-            data_dir: Directorio base con los datos
-            images_subdir: Subdirectorio de imágenes (o mismo dir si es None)
-            masks_subdir: Subdirectorio de máscaras (o mismo dir si es None)
-            save_resolution: Ancho en píxeles para guardar imágenes (default: 3840 = 4K)
-            output_dir: Directorio de salida para imágenes guardadas (default: script_dir/figures)
+            data_dir: Base directory with data
+            images_subdir: Images subdirectory (or same dir if None)
+            masks_subdir: Masks subdirectory (or same dir if None)
+            save_resolution: Width in pixels for saving images (default: 3840 = 4K)
+            output_dir: Output directory for saved images (default: script_dir/preview)
         """
         self.data_dir = Path(data_dir)
         
@@ -412,48 +412,48 @@ class QuPathHandler:
         else:
             self.masks_dir = self.data_dir
         
-        # Configuración de guardado
+        # Save configuration
         self.save_resolution = save_resolution
         if output_dir:
             self.output_dir = Path(output_dir)
         else:
-            # Por defecto: directorio del script / figures
+            # Default: script dir / preview
             script_dir = Path(__file__).parent.resolve()
             self.output_dir = script_dir / "preview"
         
-        # Estado actual
+        # Current state
         self.current_name: str | None = None
         self.image_tiff: PyramidTiff | None = None
         self.mask_tiff: PyramidTiff | None = None
         self.current_level: int = 0
         
-        # Datos cargados del nivel actual
+        # Loaded data for current level
         self.image_data: np.ndarray | None = None
         self.mask_data: np.ndarray | None = None
         
-        # Datos clínicos
+        # Clinical data
         self.clinical_data = load_clinical_data(self.data_dir)
         if self.clinical_data:
-            print(f"Cargados datos clínicos para {len(self.clinical_data)} imágenes")
+            print(f"Loaded clinical data for {len(self.clinical_data)} images")
         else:
-            print("No se encontró archivo clinical_diagnosis.txt")
-        
-        # Colormap para máscaras (todas las clases: 0-28)
+            print("clinical_diagnosis.txt file not found")
+
+        # Colormap for masks (all classes: 0-28)
         self.mask_cmap = ListedColormap(CLASS_COLORS_HEX)
         self.mask_norm = BoundaryNorm(np.arange(-0.5, len(CLASS_COLORS_HEX) + 0.5, 1), self.mask_cmap.N)
     
     def list_images(self) -> List[str]:
-        """Lista todas las imágenes disponibles."""
+        """List all available images."""
         patterns = ["*.ome.tif", "*.ome.tiff", "*.tif", "*.tiff", "*__mask_multiclass.ome.tif"]
         images = []
         for pattern in patterns:
             images.extend(self.images_dir.glob(pattern))
         
-        # Extraer nombres base (sin extensión ni sufijos)
+        # Extract base names (without extension or suffixes)
         names = set()
         for img in images:
             name = img.stem
-            # Quitar sufijos comunes
+            # Remove common suffixes
             for suffix in [".ome", "__mask_multiclass"]:
                 if name.endswith(suffix):
                     name = name[:-len(suffix)]
@@ -462,7 +462,7 @@ class QuPathHandler:
         return sorted(names)
     
     def _find_file(self, directory: Path, base_name: str, suffixes: List[str]) -> Path | None:
-        """Busca un archivo con diferentes posibles nombres."""
+        """Search for a file with different possible names."""
         extensions = [".ome.tif", ".ome.tiff", ".tif", ".tiff"]
         
         for suffix in suffixes:
@@ -475,25 +475,25 @@ class QuPathHandler:
     
     def load_pair(self, name: str, level: int | None = None) -> None:
         """
-        Carga un par imagen/máscara.
-        
+        Load an image/mask pair.
+
         Args:
-            name: Nombre base de la imagen (sin extensión)
-            level: Nivel de pirámide a cargar. None = auto (nivel que quepa en ~4MP)
+            name: Base image name (without extension)
+            level: Pyramid level to load. None = auto (level that fits in ~4MP)
         """
-        # Cerrar archivos anteriores
+        # Close previous files
         self.close()
         
         self.current_name = name
         
-        # Buscar imagen
+        # Search for image
         image_path = self._find_file(
             self.images_dir, 
             name, 
             ["", ".ome"]
         )
         
-        # Buscar máscara
+        # Search for mask
         mask_path = self._find_file(
             self.masks_dir, 
             name, 
@@ -501,28 +501,28 @@ class QuPathHandler:
         )
         
         if image_path is None:
-            print(f"No se encontró imagen para: {name}")
-            print(f"Buscado en: {self.images_dir}")
+            print(f"Image not found for: {name}")
+            print(f"Searched in: {self.images_dir}")
             return
-        
-        print(f"Cargando imagen: {image_path.name}")
+
+        print(f"Loading image: {image_path.name}")
         self.image_tiff = PyramidTiff(str(image_path))
         
         if mask_path is not None:
-            print(f"Cargando máscara: {mask_path.name}")
+            print(f"Loading mask: {mask_path.name}")
             self.mask_tiff = PyramidTiff(str(mask_path))
         else:
-            print(f"No se encontró máscara para: {name}")
+            print(f"Mask not found for: {name}")
             self.mask_tiff = None
         
-        # Determinar nivel a cargar
+        # Determine level to load
         if level is None:
             level = self.image_tiff.get_level_for_display(max_pixels=4_000_000)
         
         self._load_level(level)
     
     def _load_level(self, level: int) -> None:
-        """Carga un nivel específico en memoria."""
+        """Load a specific level into memory."""
         import gc
         
         if self.image_tiff is None:
@@ -531,35 +531,35 @@ class QuPathHandler:
         level = min(level, self.image_tiff.n_levels - 1)
         self.current_level = level
         
-        print(f"\nCargando nivel {level}...")
-        
-        # Liberar memoria del nivel anterior ANTES de cargar el nuevo
+        print(f"\nLoading level {level}...")
+
+        # Free memory from previous level BEFORE loading new one
         self.image_data = None
         self.mask_data = None
         gc.collect()
         
-        # Cargar imagen
+        # Load image
         self.image_data = self.image_tiff.read_level(level)
         info = self.image_tiff.level_info[level]
-        print(f"  Imagen: {info['width']} x {info['height']} (downsample: {info['downsample']:.1f}x)")
-        print(f"  RAM imagen: {self.image_data.nbytes / 1024 / 1024:.1f} MB")
-        
-        # Cargar máscara al mismo nivel si existe
+        print(f"  Image: {info['width']} x {info['height']} (downsample: {info['downsample']:.1f}x)")
+        print(f"  Image RAM: {self.image_data.nbytes / 1024 / 1024:.1f} MB")
+
+        # Load mask at same level if exists
         if self.mask_tiff is not None:
             mask_level = min(level, self.mask_tiff.n_levels - 1)
             self.mask_data = self.mask_tiff.read_level(mask_level)
             
-            # Asegurar 2D para máscara
+            # Ensure 2D for mask
             if self.mask_data.ndim == 3:
                 self.mask_data = self.mask_data[:, :, 0]
             
-            print(f"  Máscara: {self.mask_data.shape}")
-            print(f"  RAM máscara: {self.mask_data.nbytes / 1024 / 1024:.1f} MB")
+            print(f"  Mask: {self.mask_data.shape}")
+            print(f"  Mask RAM: {self.mask_data.nbytes / 1024 / 1024:.1f} MB")
         
         gc.collect()
     
     def get_metadata(self) -> Dict[str, Any]:
-        """Devuelve metadatos del par actual."""
+        """Return metadata for current pair."""
         if self.image_tiff is None:
             return {}
         
@@ -586,18 +586,18 @@ class QuPathHandler:
         }
     
     def get_data(self) -> Tuple[np.ndarray | None, np.ndarray | None]:
-        """Devuelve (imagen, máscara) del nivel actual."""
+        """Return (image, mask) for current level."""
         return self.image_data, self.mask_data
     
     def get_clinical_info(self, name: Optional[str] = None) -> Optional[Dict[str, str]]:
         """
-        Obtiene información clínica para una imagen.
-        
+        Get clinical information for an image.
+
         Args:
-            name: Nombre de la imagen (sin extensión). Si None, usa current_name.
-        
+            name: Image name (without extension). If None, uses current_name.
+
         Returns:
-            Dict con diagnosis, isup, gleason, scanner, o None si no encontrado.
+            Dict with diagnosis, isup, gleason, scanner, or None if not found.
         """
         if name is None:
             name = self.current_name
@@ -607,12 +607,12 @@ class QuPathHandler:
     
     def format_clinical_title(self, name: Optional[str] = None) -> str:
         """
-        Genera una cadena con información clínica para usar en títulos.
-        
+        Generate a string with clinical info for use in titles.
+
         Returns:
-            String con información clínica en dos líneas:
-            Línea 1: Diagnosis | Age | PSA | MRI
-            Línea 2: ISUP | Gleason | Scanner
+            String with clinical info in two lines:
+            Line 1: Diagnosis | Age | PSA | MRI
+            Line 2: ISUP | Gleason | Scanner
         """
         if name is None:
             name = self.current_name
@@ -621,7 +621,7 @@ class QuPathHandler:
         if info is None:
             return ""
         
-        # Primera línea: diagnóstico y datos del paciente
+        # First line: diagnosis and patient data
         line1_parts = []
         if info.get('diagnosis'):
             line1_parts.append(f"{info['diagnosis']}")
@@ -632,7 +632,7 @@ class QuPathHandler:
         if info.get('mri_findings'):
             line1_parts.append(f"MRI: {info['mri_findings']}")
         
-        # Segunda línea: clasificación y scanner
+        # Second line: classification and scanner
         line2_parts = []
         if info.get('isup') and info['isup'] != '0':
             line2_parts.append(f"ISUP: {info['isup']}")
@@ -641,7 +641,7 @@ class QuPathHandler:
         if info.get('scanner'):
             line2_parts.append(f"Scanner: {info['scanner']}")
         
-        # Combinar líneas
+        # Combine lines
         lines = []
         if line1_parts:
             lines.append(" | ".join(line1_parts))
@@ -652,30 +652,30 @@ class QuPathHandler:
     
     def _save_figure(self, fig: plt.Figure, show_legend: bool = True) -> None:
         """
-        Guarda la figura actual como PNG en alta resolución.
-        
+        Save current figure as high-resolution PNG.
+
         Args:
-            fig: Figura de matplotlib a guardar
-            show_legend: Si incluir la leyenda completa
+            fig: Matplotlib figure to save
+            show_legend: Whether to include full legend
         """
         if self.current_name is None:
-            print("  No hay imagen cargada para guardar.")
+            print("  No image loaded to save.")
             return
         
-        # Crear directorio de salida si no existe
+        # Create output directory if it doesn't exist
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
-        # Nombre del archivo: nombre de la imagen
+        # Filename: image name
         filename = f"{self.current_name}.png"
         filepath = self.output_dir / filename
         
-        # Calcular DPI para alcanzar la resolución deseada
+        # Calculate DPI to reach desired resolution
         fig_width_inches = fig.get_figwidth()
         target_dpi = self.save_resolution / fig_width_inches
         
-        # Guardar con alta calidad
-        print(f"  Guardando: {filepath}")
-        print(f"  Resolución: {self.save_resolution}px (DPI: {target_dpi:.0f})")
+        # Save with high quality
+        print(f"  Saving: {filepath}")
+        print(f"  Resolution: {self.save_resolution}px (DPI: {target_dpi:.0f})")
         
         fig.savefig(
             filepath,
@@ -687,32 +687,32 @@ class QuPathHandler:
             format='png'
         )
         
-        # Verificar tamaño final
+        # Verify final size
         try:
             from PIL import Image
             with Image.open(filepath) as img:
                 w, h = img.size
                 file_size_mb = filepath.stat().st_size / (1024 * 1024)
-                print(f"  Guardado: {w}x{h}px ({file_size_mb:.1f} MB)")
+                print(f"  Saved: {w}x{h}px ({file_size_mb:.1f} MB)")
         except ImportError:
             file_size_mb = filepath.stat().st_size / (1024 * 1024)
-            print(f"  Guardado: {file_size_mb:.1f} MB")
+            print(f"  Saved: {file_size_mb:.1f} MB")
     
     def visualize(self, show_legend: bool = True, save_only: bool = False) -> None:
         """
-        Visualización con zoom/pan sincronizado entre imagen y máscara.
-        Usa la herramienta de zoom de matplotlib para explorar.
-        
+        Visualization with synchronized zoom/pan between image and mask.
+        Uses matplotlib zoom tool to explore.
+
         Args:
-            show_legend: Si mostrar leyenda de clases
-            save_only: Si True, guarda PNG y cierra sin mostrar ventana (modo batch)
-        
-        Controles (cuando save_only=False):
-            - S: Guardar imagen PNG en alta resolución
-            - Q: Cerrar ventana
+            show_legend: Whether to show class legend
+            save_only: If True, save PNG and close without showing window (batch mode)
+
+        Controls (when save_only=False):
+            - S: Save high-resolution PNG
+            - Q: Close window
         """
         if self.image_data is None:
-            print("No hay datos cargados. Usa load_pair() primero.")
+            print("No data loaded. Use load_pair() first.")
             return
         
         has_mask = self.mask_data is not None
@@ -725,7 +725,7 @@ class QuPathHandler:
         ax_img = axes[0]
         ax_mask = axes[1] if has_mask else None
         
-        # Título con información clínica
+        # Title with clinical info
         level_info = self.image_tiff.level_info[self.current_level]
         title = f"{self.current_name} | Level {self.current_level} | {level_info['width']}x{level_info['height']} (ds: {level_info['downsample']:.0f}x)"
         clinical_str = self.format_clinical_title()
@@ -767,7 +767,7 @@ class QuPathHandler:
                     fontsize=8
                 )
             
-            # Sincronizar zoom/pan entre los dos axes
+            # Synchronize zoom/pan between both axes
             self._syncing = False
             
             def sync_from_img(event_ax):
@@ -797,13 +797,13 @@ class QuPathHandler:
             ax_mask.callbacks.connect('xlim_changed', sync_from_mask)
             ax_mask.callbacks.connect('ylim_changed', sync_from_mask)
         
-        # Handler para guardar con tecla S (solo si no es save_only)
+        # Handler to save with S key (only if not save_only)
         if not save_only:
             def on_key(event):
                 if event.key == 's':
                     self._save_figure(fig, show_legend=show_legend)
             fig.canvas.mpl_connect('key_press_event', on_key)
-            print("  [Controles] S: guardar PNG | Q: cerrar")
+            print("  [Controls] S: save PNG | Q: close")
         
         plt.tight_layout()
         if save_only:
@@ -814,40 +814,40 @@ class QuPathHandler:
     
     def visualize_interactive(self) -> None:
         """
-        Visualización interactiva con slider de nivel.
-        Permite cambiar el nivel de resolución en tiempo real.
+        Interactive visualization with level slider.
+        Allows changing resolution level in real time.
         """
         if self.image_tiff is None:
-            print("No hay datos cargados. Usa load_pair() primero.")
+            print("No data loaded. Use load_pair() first.")
             return
         
         has_mask = self.mask_data is not None
         n_cols = 2 if has_mask else 1
         
-        # Crear figura con espacio para slider
+        # Create figure with space for slider
         fig = plt.figure(figsize=(7 * n_cols, 8))
         
-        # Axes para las imágenes
+        # Axes for images
         ax_img = fig.add_axes([0.05, 0.15, 0.4 if has_mask else 0.9, 0.75])
         ax_mask = fig.add_axes([0.55, 0.15, 0.4, 0.75]) if has_mask else None
         
-        # Axis para slider
+        # Axis for slider
         ax_slider = fig.add_axes([0.2, 0.02, 0.6, 0.03])
         
-        # Slider de nivel
+        # Level slider
         n_levels = self.image_tiff.n_levels
         slider = Slider(
             ax_slider,
-            'Nivel',
+            'Level',
             0,
             n_levels - 1,
             valinit=self.current_level,
             valstep=1
         )
         
-        # Mostrar imágenes iniciales
+        # Show initial images
         img_display = ax_img.imshow(self.image_data)
-        ax_img.set_title("Imagen")
+        ax_img.set_title("Image")
         ax_img.axis('off')
         
         mask_display = None
@@ -858,7 +858,7 @@ class QuPathHandler:
                 norm=self.mask_norm,
                 interpolation='nearest'
             )
-            ax_mask.set_title("Máscara")
+            ax_mask.set_title("Mask")
             ax_mask.axis('off')
         
         def update_title():
@@ -894,9 +894,9 @@ class QuPathHandler:
         
         slider.on_changed(on_slider_change)
         
-        # Sincronizar zoom/pan entre los dos axes
+        # Synchronize zoom/pan between both axes
         if ax_mask is not None:
-            # Flag para evitar recursión infinita
+            # Flag to avoid infinite recursion
             self._syncing = False
             
             def sync_from_img(event_ax):
@@ -926,25 +926,25 @@ class QuPathHandler:
             ax_mask.callbacks.connect('xlim_changed', sync_from_mask)
             ax_mask.callbacks.connect('ylim_changed', sync_from_mask)
         
-        # Handler para guardar con tecla S
+        # Handler to save with S key
         def on_key(event):
             if event.key == 's':
                 self._save_figure(fig, show_legend=True)
         
         fig.canvas.mpl_connect('key_press_event', on_key)
         
-        print("  [Controles] S: guardar PNG | Q: cerrar | Slider: cambiar nivel")
+        print("  [Controls] S: save PNG | Q: close | Slider: change level")
         plt.show()
     
     def change_level(self, level: int) -> None:
-        """Cambia al nivel especificado."""
+        """Change to specified level."""
         if self.image_tiff is None:
-            print("No hay datos cargados.")
+            print("No data loaded.")
             return
         self._load_level(level)
     
     def close(self) -> None:
-        """Cierra los archivos abiertos y libera memoria."""
+        """Close open files and free memory."""
         if self.image_tiff is not None:
             self.image_tiff.close()
             self.image_tiff = None
@@ -965,51 +965,51 @@ class QuPathHandler:
 
 
 def main():
-    """Recorre todas las imágenes del dataset y las visualiza."""
+    """Iterate over all images in the dataset and visualize them."""
     import argparse
     
     parser = argparse.ArgumentParser(
-        description="Visualizador de imágenes y máscaras QuPath",
+        description="QuPath image and mask visualizer",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Ejemplos:
-  # Visualizar todas las imágenes del dataset
-  python qupath_handler.py /ruta/datos
-  
-  # Especificar nivel de resolución
-  python qupath_handler.py /ruta/datos --level 2
-  
-  # Guardar screenshots en 8K
-  python qupath_handler.py /ruta/datos --save-resolution 7680
-  
-  # Modo batch: guardar todas las imágenes sin abrir ventanas
-  python qupath_handler.py /ruta/datos --batch-save
+Examples:
+  # Visualize all images in the dataset
+  python qupath_handler.py /path/to/data
 
-Estructura de directorios esperada:
+  # Specify resolution level
+  python qupath_handler.py /path/to/data --level 2
+
+  # Save screenshots in 8K
+  python qupath_handler.py /path/to/data --save-resolution 7680
+
+  # Batch mode: save all images without opening windows
+  python qupath_handler.py /path/to/data --batch-save
+
+Expected directory structure:
   data_dir/
     images/
-      imagen1.ome.tif
-      imagen2.ome.tif
+      image1.ome.tif
+      image2.ome.tif
     masks/
-      imagen1__mask_multiclass.ome.tif
-      imagen2__mask_multiclass.ome.tif
+      image1__mask_multiclass.ome.tif
+      image2__mask_multiclass.ome.tif
 
-Controles:
-  S: Guardar PNG en alta resolución
-  Q: Cerrar ventana y pasar a siguiente
+Controls:
+  S: Save high-resolution PNG
+  Q: Close window and go to next
         """
     )
     
-    parser.add_argument("data_dir", help="Directorio del dataset con images/ y masks/")
-    parser.add_argument("--level", "-l", type=int, default=None, help="Nivel de pirámide (default: auto)")
-    parser.add_argument("--images-dir", default="images", help="Subdirectorio de imágenes")
-    parser.add_argument("--masks-dir", default="masks", help="Subdirectorio de máscaras")
-    parser.add_argument("--save-resolution", "-r", type=int, default=3840, 
-                        help="Ancho en píxeles para guardar imágenes (default: 3840 = 4K)")
-    parser.add_argument("--output-dir", "-o", default=None, 
-                        help="Directorio de salida para screenshots (default: script_dir/figures)")
+    parser.add_argument("data_dir", help="Dataset directory with images/ and masks/")
+    parser.add_argument("--level", "-l", type=int, default=None, help="Pyramid level (default: auto)")
+    parser.add_argument("--images-dir", default="images", help="Images subdirectory")
+    parser.add_argument("--masks-dir", default="masks", help="Masks subdirectory")
+    parser.add_argument("--save-resolution", "-r", type=int, default=3840,
+                        help="Width in pixels for saving images (default: 3840 = 4K)")
+    parser.add_argument("--output-dir", "-o", default=None,
+                        help="Output directory for screenshots (default: script_dir/preview)")
     parser.add_argument("--batch-save", "--save-all", dest="batch_save", action="store_true",
-                        help="Recorrer todas las imágenes y guardar PNG sin abrir ventanas")
+                        help="Iterate all images and save PNG without opening windows")
     
     args = parser.parse_args()
     
@@ -1024,14 +1024,14 @@ Controles:
     images = handler.list_images()
     
     if not images:
-        print("No se encontraron imágenes.")
+        print("No images found.")
         return
-    
-    print(f"\nEncontradas {len(images)} imágenes")
+
+    print(f"\nFound {len(images)} images")
     if args.batch_save:
-        print("Modo batch: guardando PNG sin abrir ventanas.\n")
+        print("Batch mode: saving PNG without opening windows.\n")
     else:
-        print("Cierra cada ventana para pasar a la siguiente.\n")
+        print("Close each window to proceed to the next.\n")
     
     for i, name in enumerate(images):
         print(f"[{i+1}/{len(images)}] {name}")
@@ -1040,20 +1040,20 @@ Controles:
             handler.load_pair(name, level=args.level)
             
             meta = handler.get_metadata()
-            print(f"  Tamaño base: {meta.get('base_size')}")
-            print(f"  Nivel cargado: {meta.get('current_level')}")
-            
-            # Mostrar información clínica si está disponible
+            print(f"  Base size: {meta.get('base_size')}")
+            print(f"  Loaded level: {meta.get('current_level')}")
+
+            # Show clinical info if available
             clinical = handler.get_clinical_info(name)
             if clinical:
-                print(f"  Diagnóstico: {clinical.get('diagnosis', 'N/A')}")
-                # Datos del paciente
+                print(f"  Diagnosis: {clinical.get('diagnosis', 'N/A')}")
+                # Patient data
                 age = clinical.get('age', '')
                 psa = clinical.get('psa', '')
                 if age or psa:
                     patient_info = []
                     if age:
-                        patient_info.append(f"Edad: {age}")
+                        patient_info.append(f"Age: {age}")
                     if psa:
                         patient_info.append(f"PSA: {psa}")
                     print(f"  {' | '.join(patient_info)}")
@@ -1061,7 +1061,7 @@ Controles:
                 mri = clinical.get('mri_findings', '')
                 if mri:
                     print(f"  MRI: {mri}")
-                # Clasificación
+                # Classification
                 isup = clinical.get('isup', '')
                 gleason = clinical.get('gleason', '')
                 if isup and isup != '0':
@@ -1078,7 +1078,7 @@ Controles:
         finally:
             handler.close()
     
-    print("\nVisualizacion completada.")
+    print("\nVisualization completed.")
 
 
 if __name__ == "__main__":
