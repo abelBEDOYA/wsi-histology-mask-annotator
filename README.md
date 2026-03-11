@@ -67,7 +67,7 @@ OUTPUT_DIR/
 
 - **Format**: Pyramidal OME-TIFF (`.ome.tif`)
 - **Type**: Grayscale (1 channel, 8 bits)
-- **Encoding**: Each pixel value corresponds to the class ID (0 = background, 1–27 = annotated classes)
+- **Encoding**: Each pixel value corresponds to the class ID (0 = background, 1–28 = annotated classes)
 - **Compression**: LZW (lossless)
 - **Tiles**: 512×512 pixels
 - **Pyramid**: Identical to the image (same region, same levels)
@@ -104,6 +104,7 @@ OUTPUT_DIR/
 | 25 | Nerve ganglion |
 | 26 | Atypical intraductal proliferation |
 | 27 | Red blood cells |
+| 28 | Stroma |
 
 ### Using the Groovy script
 
