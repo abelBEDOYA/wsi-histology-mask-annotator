@@ -61,7 +61,7 @@ mkdirs(masksDir)
 
 def CLASS_NAMES = [
     "Tumor",                          // ID: 1  (9724, 62.8%)
-    "Bening gland",                   // ID: 2  (2657, 17.2%)
+    "Benign gland",                   // ID: 2  (2657, 17.2%)
     "Blood vessels",                  // ID: 3  (789, 5.1%)
     "Fibromuscular bundles",          // ID: 4  (683, 4.4%)
     "Abnormal secretions",            // ID: 5  (301, 1.9%)
@@ -80,7 +80,7 @@ def CLASS_NAMES = [
     "Calcifications",                 // ID: 18 (13, 0.1%)
     "Intestinal glands and mucus",    // ID: 19 (10, 0.1%)
     "Perineural invasion (PNI)",      // ID: 20 (8, 0.1%)
-    "Hemorrahage",                    // ID: 21 (8, 0.1%)
+    "Hemorrhage",                    // ID: 21 (8, 0.1%)
     "Intraductal carcinoma",          // ID: 22 (6, 0.0%)
     "Necrosis",                       // ID: 23 (6, 0.0%)
     "Mitosis",                        // ID: 24 (5, 0.0%)

@@ -1,0 +1,21 @@
+# Python
+*.pyc
+__pycache__/
+
+# Shell scripts
+*.sh
+
+
+# Dataset — heavy content (images, masks, vectors, previews)
+dataset/export/images/*
+dataset/export/semantic_masks/*
+dataset/export/vector_labels/*
+dataset/export/previews/*
+
+# Dataset — metadata files
+dataset/export/*.csv
+dataset/export/*.txt
+*.zip
+
+# Allow .gitkeep to preserve directory structure
+!**/.gitkeep
